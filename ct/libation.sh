@@ -14,7 +14,6 @@ var_disk=8
 var_os="debian"
 var_version="12"
 var_unprivileged=1
-var_timezone="UTC"
 
 # App Output & Base Settings
 header_info "$APP"
@@ -25,21 +24,25 @@ variables
 color
 catch_errors
 
-function post_install() {
-    msg_info "Installing dependencies"
-    lxc-apt install -y python3 python3-pip git ffmpeg
-    msg_ok "Dependencies installed"
+function update_script() {
+  header_info
+  check_container_storage
+  check_container_resources
 
-    msg_info "Cloning Libation repository"
-    git clone https://github.com/rmcrackan/Libation.git /root/Libation
-    msg_ok "Repository cloned"
+  msg_info "Installing dependencies"
+  lxc-apt install -y python3 python3-pip git ffmpeg
+  msg_ok "Dependencies installed"
 
-    msg_info "Installing Python requirements"
-    pip3 install -r /root/Libation/requirements.txt
-    msg_ok "Python requirements installed"
+  msg_info "Cloning Libation repository"
+  git clone https://github.com/rmcrackan/Libation.git /root/Libation
+  msg_ok "Repository cloned"
 
-    msg_info "Setting up systemd service"
-    cat <<EOF > /etc/systemd/system/libation.service
+  msg_info "Installing Python requirements"
+  pip3 install -r /root/Libation/requirements.txt
+  msg_ok "Python requirements installed"
+
+  msg_info "Setting up systemd service"
+  cat <<EOF > /etc/systemd/system/libation.service
 [Unit]
 Description=Libation Audible Backup Service
 After=network.target
@@ -53,50 +56,48 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 EOF
-    systemctl daemon-reload
-    systemctl enable libation
-    systemctl start libation
-    msg_ok "Systemd service configured"
+  systemctl daemon-reload
+  systemctl enable libation
+  systemctl start libation
+  msg_ok "Systemd service configured"
 
-    msg_info "Setting up cron job for automatic updates"
-    cat <<EOF > /etc/cron.daily/libation-update
+  msg_info "Setting up cron job for automatic updates"
+  cat <<EOF > /etc/cron.daily/libation-update
 #!/bin/bash
 REPO_DIR="/root/Libation"
 LATEST_HASH=\$(git -C "\$REPO_DIR" rev-parse HEAD)
 REMOTE_HASH=\$(git -C "\$REPO_DIR" ls-remote origin -h refs/heads/master | cut -f1)
 if [ "\$LATEST_HASH" != "\$REMOTE_HASH" ]; then
-    echo "Update available. Pulling latest changes..."
-    git -C "\$REPO_DIR" pull
-    systemctl restart libation
-    echo "Libation service restarted after update."
+  echo "Update available. Pulling latest changes..."
+  git -C "\$REPO_DIR" pull
+  systemctl restart libation
+  echo "Libation service restarted after update."
 else
-    echo "No update required."
+  echo "No update required."
 fi
 EOF
-    chmod +x /etc/cron.daily/libation-update
-    msg_ok "Cron job for automatic updates set up"
-}
+  chmod +x /etc/cron.daily/libation-update
+  msg_ok "Cron job for automatic updates set up"
 
-function create_mounts() {
-    msg_info "Creating default book and config directories"
-    mkdir -p /mnt/Libation/Books
-    msg_ok "Directories created"
+  msg_info "Creating default book and config directories"
+  mkdir -p /mnt/Libation/Books
+  msg_ok "Directories created"
 
-    msg_info "Adding custom mounts to the LXC container"
-    pct set ${CTID} -mp0 /mnt/Libation/Books,mp=/root/Libation/Books
-    msg_ok "Custom mounts added"
+  msg_info "Adding custom mounts to the LXC container"
+  pct set ${CTID} -mp0 /mnt/Libation/Books,mp=/root/Libation/Books
+  msg_ok "Custom mounts added"
 }
 
 function config_instructions() {
-    echo -e "\n${INFO}${YW} To edit your Libation configuration, use the following commands:${CL}"
-    echo -e "${TAB}${GN}nano /root/Libation/libation.config.json${CL}"
-    echo -e "\n${INFO}${YW} Your audiobooks should be placed in the following directory:${CL}"
-    echo -e "${TAB}${GN}/mnt/Libation/Books${CL}"
+  echo -e "\n${INFO}${YW} To edit your Libation configuration, use the following commands:${CL}"
+  echo -e "${TAB}${GN}nano /root/Libation/libation.config.json${CL}"
+  echo -e "\n${INFO}${YW} Your audiobooks should be placed in the following directory:${CL}"
+  echo -e "${TAB}${GN}/mnt/Libation/Books${CL}"
 }
 
+start
 build_container
-post_install
-create_mounts
+update_script
 config_instructions
 
 msg_ok "Completed Successfully!\n"
