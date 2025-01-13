@@ -30,19 +30,19 @@ function update_script() {
   check_container_resources
 
   msg_info "Installing dependencies"
-  lxc-apt install -y python3 python3-pip git ffmpeg
+  pct exec ${CTID} -- bash -c "apt update && apt install -y python3 python3-pip git ffmpeg"
   msg_ok "Dependencies installed"
 
   msg_info "Cloning Libation repository"
-  git clone https://github.com/rmcrackan/Libation.git /root/Libation
+  pct exec ${CTID} -- git clone https://github.com/rmcrackan/Libation.git /root/Libation
   msg_ok "Repository cloned"
 
   msg_info "Installing Python requirements"
-  pip3 install -r /root/Libation/requirements.txt
+  pct exec ${CTID} -- pip3 install -r /root/Libation/requirements.txt
   msg_ok "Python requirements installed"
 
   msg_info "Setting up systemd service"
-  cat <<EOF > /etc/systemd/system/libation.service
+  pct exec ${CTID} -- bash -c 'cat <<EOF > /etc/systemd/system/libation.service
 [Unit]
 Description=Libation Audible Backup Service
 After=network.target
@@ -55,14 +55,14 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload
-  systemctl enable libation
-  systemctl start libation
+EOF'
+  pct exec ${CTID} -- systemctl daemon-reload
+  pct exec ${CTID} -- systemctl enable libation
+  pct exec ${CTID} -- systemctl start libation
   msg_ok "Systemd service configured"
 
   msg_info "Setting up cron job for automatic updates"
-  cat <<EOF > /etc/cron.daily/libation-update
+  pct exec ${CTID} -- bash -c 'cat <<EOF > /etc/cron.daily/libation-update
 #!/bin/bash
 REPO_DIR="/root/Libation"
 LATEST_HASH=\$(git -C "\$REPO_DIR" rev-parse HEAD)
@@ -75,8 +75,8 @@ if [ "\$LATEST_HASH" != "\$REMOTE_HASH" ]; then
 else
   echo "No update required."
 fi
-EOF
-  chmod +x /etc/cron.daily/libation-update
+EOF'
+  pct exec ${CTID} -- chmod +x /etc/cron.daily/libation-update
   msg_ok "Cron job for automatic updates set up"
 
   msg_info "Creating default book and config directories"
